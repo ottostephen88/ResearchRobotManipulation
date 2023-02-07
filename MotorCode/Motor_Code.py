@@ -4,7 +4,7 @@ class Motors:
     def __init__(self):
         # e.g 'COM3' windows or '/dev/ttyUSB0' for Linux
         # sets baudrate and opens com port
-        Ax12.DEVICENAME = 'COM6'
+        Ax12.DEVICENAME = 'COM3'
         Ax12.BAUDRATE = 1_000_000
         # sets baudrate and opens com port
         Ax12.connect()
@@ -24,7 +24,7 @@ class Motors:
         #servo joint length
         self.servojoint = 84
         # torque in bits from 0-1023
-        self.torque = 500
+        self.torque = 200
         self.Motor1.set_torque_limit(self.torque)
         self.Motor2.set_torque_limit(self.torque)
         
@@ -99,7 +99,8 @@ if __name__ == "__main__":
     #Controller.setup()   """
     while True:
         print(Controller.getEndEffectorPosition())
-
-        print(Controller.distance2theta(24.5))
+        width_object = 70
+        half_distance = width_object/2
+        print(Controller.distance2theta(half_distance))
         input_pos = int(input("goal pos(91-174 deg): "))
         Controller.position(input_pos)
