@@ -4,11 +4,12 @@ class Motors:
     def __init__(self):
         # e.g 'COM3' windows or '/dev/ttyUSB0' for Linux
         # sets baudrate and opens com port
-        Ax12.DEVICENAME = 'COM3'
+        Ax12.DEVICENAME = 'COM5'
         Ax12.BAUDRATE = 1_000_000
         # sets baudrate and opens com port
         Ax12.connect()
         # create AX12 instance with ID 1 and 2
+        #Motor ID1 should be on the right with the camera facing you
         motor_id1 = 1
         motor_id2 = 2
         self.Motor1 = Ax12(motor_id1)
@@ -17,38 +18,40 @@ class Motors:
         self.speed = 100
         self.Motor1.set_moving_speed(self.speed)
         self.Motor2.set_moving_speed(self.speed)
-        #the theta that gives parallel position of ID 1
-        self.parallel_theta1 = 150
-        #the theta that gives parallel position of ID 2
-        self.parallel_theta2 = 155
-        #servo joint length
-        self.servojoint = 84
         # torque in bits from 0-1023
         self.torque = 200
         self.Motor1.set_torque_limit(self.torque)
         self.Motor2.set_torque_limit(self.torque)
+        #input motor theta max and measurements by using dynamixel
+        self.Motor1theta_max = 176
+        self.Motor1theta_min = 85
+        self.Motor2theta_max = 218
+        self.Motor2theta_min = 128
+        # set bar parallel to camera(Input)
+        self.Motor1theta_90 = 150
+        # set bar parallel to camera(Input)
+        self.Motor2theta_90 = 155
+        #dont touch
+        self.Crank = 45
+        self.Finger= 80
+        self.OffsetCamera2Crank = 38
+        self.OffsetCrank2Finger = 24.32
+        self.servojoint = 84
+        #plug in last reference frame to camera position for z axis
+        self.Camera2Ref = 0
         
     #this is before you attach your motors to the gripper       
     def setup(self):
         self.Motor1.set_goal_position(0)
         self.Motor2.set_goal_position(1023)
         
-    def position(self, desiredPosition):
-        #constraints are set because of grippers kinematic limitations(DO NOT CHANGE)
-        constraint1 = self.parallel_theta1 - 150 + 90
-        constraint2 = self.parallel_theta1 - 150 + 175
-        #need this because the theta is opposite
-        difference = self.parallel_theta1 - desiredPosition
-        desiredPosition2 = self.parallel_theta2 + difference
-        if constraint1 < desiredPosition < constraint2:
-            desiredPosition = round(desiredPosition * 3.41)
-            desiredPosition2 = round(desiredPosition2 * 3.41)
-
-            self.Motor1.set_goal_position(desiredPosition)
-            #other motor needs to be opposite
-            self.Motor2.set_goal_position(desiredPosition2)
-        else:
-            print("invalid position")
+    def position(self, delta_theta):
+        Motor1_theta = -delta_theta + self.Motor1theta_90
+        Motor2_theta = delta_theta + self.Motor2theta_90
+        desiredPosition1 = int(Motor1_theta*1023/(300))
+        desiredPosition2 = int(Motor2_theta*1023/(300))
+        self.Motor1.set_goal_position(desiredPosition1)
+        self.Motor2.set_goal_position(desiredPosition2)
             
     def torquelimit(self, torqueLimit):
         self.Motor1.set_torque_limit(torqueLimit)
@@ -57,50 +60,68 @@ class Motors:
     def speedlimit(self, speedLimit):
         self.Motor1.set_moving_speed(speedLimit)
         self.Motor2.set_moving_speed(speedLimit)
-        
-    def theta2distance(self,theta1,theta2):
-        #theta needs to be in radians
-        #[xpos, ypos to pincher top, ypos to pincher bottom]
-        positionFromCenter1 = [math.sin(theta1)*45 + 16.857, math.cos(theta1)*45 - 16.7, math.cos(theta1)*45 - 16.7 + self.servojoint]
-        positionFromCenter2 = [math.sin(theta2)*45 - 17.58, math.cos(theta2)*45 - 16.7, math.cos(theta2)*45 - 16.7 + self.servojoint]
-        positionFromCenter = [positionFromCenter1, positionFromCenter2]
-        return positionFromCenter
     
-    def distance2theta(self,xPositionFromCenter):
-        x = xPositionFromCenter - 5
-        theta1 = math.asin((x - 16.87)/45)
-        theta1 = round(150 - math.degrees(theta1))
+    def distance2theta(self,width):
+        xPositionFromCenter = width/2
+        #positive movement means it goes away from center(open gripper)
+        #negative means it closes the gripper
+        Movement = xPositionFromCenter - self.OffsetCamera2Crank + self.OffsetCrank2Finger
+        delta_theta = math.degrees(math.asin(Movement/self.Crank))
         #theta comes in degrees
-        return theta1
-        
-    def getEndEffectorPosition(self):
-        theta1 = math.radians(150 - (round(self.Motor1.get_present_position() / 3.41)))
-        theta2 = math.radians(155 - (round(self.Motor2.get_present_position() / 3.41)))
-        positionFromCenter = self.theta2distance(theta1,theta2)
-        return positionFromCenter
+        return delta_theta
     
+    def thetaLimit(self,delta_theta):
+        Motor1_theta = -delta_theta + self.Motor1theta_90
+        Motor2_theta = delta_theta + self.Motor2theta_90
+        if (Motor1_theta > self.Motor1theta_max or  Motor1_theta < self.Motor1theta_min):
+            return 1
+        if (Motor2_theta > self.Motor2theta_max or  Motor2_theta < self.Motor2theta_min):
+            return 1
+        return 0
+    
+    def distanceFromRef(self, delta_theta):
+        delta_Z = self.Crank*math.cos(math.radians(delta_theta)) - 14 + 81.32 + self.Camera2Ref
+        return deltaZ
+
+    def getPosition(self)
+        self.Motor1.get_present_position()
+        self.Motor2.get_present_position()
+        
     def openGripper(self):
-        self.position(92)
+        open1 = int((self.Motor1theta_min+4)*1023/300)
+        open2 = int((self.Motor2theta_max-4)*1023/300)
+        self.Motor1.set_goal_position(open1)
+        self.Motor2.set_goal_position(open2)
+
+    def Temp(self)
+        self.Motor1.get_temperature()
+        self.Motor2.get_temperature()
         
-    
-    def gettheta(self):
-        print(round(self.Motor1.get_present_position() / 3.41),"theta1")
-        print(round(self.Motor2.get_present_position() / 3.41),"theta2")
-        
-
-
-
+    def Load(self)
+        self.Motor1.get_load()
+        self.Motor2.get_load()
 
 if __name__ == "__main__":
     #Initializes everything
     Controller = Motors()
     Controller.openGripper()
-    """  use this line before attaching motors
-    #Controller.setup()   """
     while True:
-        print(Controller.getEndEffectorPosition())
-        width_object = 70
-        half_distance = width_object/2
-        print(Controller.distance2theta(half_distance))
-        input_pos = int(input("goal pos(91-174 deg): "))
-        Controller.position(input_pos)
+        width_object = int(input("Input Width"))
+        delta_theta = Controller.distance2theta(width_object)
+        error = Controller.thetaLimit(delta_theta)
+        if error :
+            print("error")
+            continue
+        Dist = distanceFromRef(delta_theta)
+        Controller.position(delta_theta)
+
+
+
+
+
+
+
+
+
+
+
