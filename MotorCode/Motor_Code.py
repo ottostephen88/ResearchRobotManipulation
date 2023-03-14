@@ -38,7 +38,7 @@ class Motors:
         self.OffsetCrank2Finger = 24.32
         self.servojoint = 84
         #plug in last reference frame to camera position for z axis
-        self.Camera2Ref = 0
+        self.Camera2Ref = 63
         
     #this is before you attach your motors to the gripper       
     def setup(self):
@@ -83,7 +83,7 @@ class Motors:
         delta_Z = self.Crank*math.cos(math.radians(delta_theta)) - 14 + 81.32 + self.Camera2Ref
         return deltaZ
 
-    def getPosition(self)
+    def getPosition(self):
         self.Motor1.get_present_position()
         self.Motor2.get_present_position()
         
@@ -93,11 +93,11 @@ class Motors:
         self.Motor1.set_goal_position(open1)
         self.Motor2.set_goal_position(open2)
 
-    def Temp(self)
+    def Temp(self):
         self.Motor1.get_temperature()
         self.Motor2.get_temperature()
         
-    def Load(self)
+    def Load(self):
         self.Motor1.get_load()
         self.Motor2.get_load()
 
